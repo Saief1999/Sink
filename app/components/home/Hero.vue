@@ -1,16 +1,45 @@
 <script setup lang="ts">
-import { ArrowRight } from 'lucide-vue-next'
-import { GitHubIcon, XIcon } from 'vue3-simple-icons'
+import type { Link } from '@/types'
+import { CircleArrowRight } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import heroUrl from '@/assets/images/hero.svg?url'
 
-const { title, description, github, twitter } = useAppConfig()
+const { title, description, github } = useAppConfig()
+
+const createOpen = ref(false)
+const formRef = ref<{ randomSlug: () => void } | null>(null)
+
+function onShortenClick() {
+  if (!getAuthToken()) {
+    navigateTo('/dashboard/login')
+    return
+  }
+  createOpen.value = true
+}
+
+watch([createOpen, formRef], ([open, form]) => {
+  if (open && form)
+    nextTick(() => form.randomSlug())
+})
+
+async function handleSuccess(link: Link) {
+  createOpen.value = false
+  const shortLink = `${window.location.origin}/${link.slug}`
+  try {
+    await navigator.clipboard.writeText(shortLink)
+    toast.success(shortLink, { description: 'Copied to clipboard' })
+  }
+  catch {
+    toast.success(shortLink)
+  }
+}
 </script>
 
 <template>
-  <section>
+  <section class="flex flex-1 items-center">
     <div
       class="
-        py-16
+        w-full py-16
         md:py-24
       "
     >
@@ -26,31 +55,6 @@ const { title, description, github, twitter } = useAppConfig()
             lg:text-left
           "
         >
-          <!-- Twitter Follow Badge -->
-          <a
-            :href="twitter"
-            target="_blank"
-            rel="noopener"
-            :title="$t('home.twitter.follow')"
-            class="
-              mx-auto mb-8 inline-flex w-fit items-center gap-2 rounded-full
-              border p-1 pr-3
-              lg:mx-0
-            "
-          >
-            <span
-              class="
-                flex items-center gap-1.5 rounded-full bg-muted px-2 py-1
-                text-xs
-              "
-            >
-              <XIcon aria-hidden="true" class="size-3" />
-            </span>
-            <span class="text-sm">{{ $t('home.twitter.follow') }}</span>
-            <span class="block h-4 w-px bg-border" />
-            <ArrowRight aria-hidden="true" class="size-4" />
-          </a>
-
           <h1
             class="
               text-4xl font-medium text-balance
@@ -72,31 +76,39 @@ const { title, description, github, twitter } = useAppConfig()
             "
           >
             <Button
-              as-child
               size="lg"
-              class="px-5 text-base"
+              class="h-12 px-8 text-lg"
+              @click="onShortenClick"
             >
-              <NuxtLink to="/dashboard">
-                <span class="text-nowrap">{{ $t('dashboard.title') }}</span>
-              </NuxtLink>
+              <span class="text-nowrap">Shorten Link</span>
+              <CircleArrowRight aria-hidden="true" class="size-5" />
             </Button>
             <Button
               as-child
               size="lg"
               variant="ghost"
-              class="px-5 text-base"
+              class="h-12 px-5 text-lg text-muted-foreground"
             >
-              <a
-                :href="github"
-                target="_blank"
-                :title="$t('layouts.footer.social.github')"
-                class="flex items-center gap-1.5"
-              >
-                <GitHubIcon aria-hidden="true" class="size-5" />
-                <span class="text-nowrap">{{ $t('home.hero.github_repo') }}</span>
-              </a>
+              <NuxtLink to="/dashboard">
+                <span class="text-nowrap">{{ $t('dashboard.title') }}</span>
+              </NuxtLink>
             </Button>
           </div>
+
+          <p
+            class="mt-8 text-sm text-muted-foreground"
+          >
+            Runs on Cloudflare · Built with Nuxt ·
+            <a
+              :href="github"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="
+                underline underline-offset-4
+                hover:text-primary
+              "
+            >Open source</a>
+          </p>
         </div>
 
         <object
@@ -112,5 +124,30 @@ const { title, description, github, twitter } = useAppConfig()
         />
       </div>
     </div>
+
+    <ResponsiveModal
+      v-model:open="createOpen"
+      :title="$t('links.create')"
+    >
+      <LazyDashboardLinksEditorForm
+        ref="formRef"
+        :link="{}"
+        :is-edit="false"
+        @success="handleSuccess"
+      />
+
+      <template #footer>
+        <Button
+          type="button"
+          variant="secondary"
+          @click="createOpen = false"
+        >
+          {{ $t('common.close') }}
+        </Button>
+        <Button type="submit" form="link-editor-form">
+          {{ $t('common.save') }}
+        </Button>
+      </template>
+    </ResponsiveModal>
   </section>
 </template>
